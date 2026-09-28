@@ -101,21 +101,21 @@ df["prev_tz"]=[voff(t,d) for t,d in zip(df.prev_timezone,df.game_date)]
 df["timezone_shift_hours"]=df.tz-df.prev_tz; df["abs_timezone_shift"]=df.timezone_shift_hours.abs()
 
 st=[]
-for _,q in df.groupby("team_abbreviation",sort=False):
+for _,q in df.groupby(["season","team_abbreviation"],sort=False):
     s=0
     for h in q.is_home:
         s=0 if h else s+1; st.append(s)
 df["road_streak"]=st
 
 den=pd.Series(index=df.index,dtype=float)
-for _,idx in df.groupby("team_abbreviation").groups.items():
+for _,idx in df.groupby(["season","team_abbreviation"]).groups.items():
     q=df.loc[idx,["game_date"]].sort_values("game_date"); dates=q.game_date.to_numpy(dtype="datetime64[D]"); vals=[]
     for i,d in enumerate(dates):
         z=dates[:i+1]; vals.append(int(((z>=d-np.timedelta64(6,"D"))&(z<=d)).sum()))
     den.loc[q.index]=vals
 df["games_last_7d"]=den.astype(int)
 df["win"]=df.wl.eq("W").astype(int); df["point_diff"]=pd.to_numeric(df.plus_minus,errors="coerce")
-df["team_form_10"]=df.groupby("team_abbreviation").win.transform(lambda s:s.shift(1).rolling(10,min_periods=5).mean())
+df["team_form_10"]=df.groupby(["season","team_abbreviation"]).win.transform(lambda s:s.shift(1).rolling(10,min_periods=5).mean())
 
 df["rest_deficit"]=(2-df.rest_days.fillna(2)).clip(0,2)
 df["log_travel_km"]=np.log1p(df.travel_km); df["altitude_gain_km"]=df.altitude_gain_m/1000
