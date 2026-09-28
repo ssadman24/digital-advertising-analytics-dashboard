@@ -153,13 +153,13 @@ lc=float(logit.params["friction_diff"]); lp=float(logit.pvalues["friction_diff"]
 m1=mod.copy(); m1["friction_diff"]=m1.friction_diff+1
 ame=float((logit.predict(m1)-logit.predict(mod)).mean())
 
-road=df[df.is_home.eq(0)].copy()
+road=df[(df.is_home.eq(0)) & (df.neutral_site.eq(0))].copy()
 road["decile"]=pd.qcut(road.sfi_pct,10,labels=False,duplicates="drop")+1
 dec=road.groupby("decile").agg(games=("game_id","size"),win_pct=("win","mean"),avg_margin=("point_diff","mean"),avg_travel_km=("travel_km","mean")).reset_index()
 team=df.groupby("team_abbreviation").agg(games=("game_id","size"),total_travel_km=("travel_km","sum"),avg_friction_pct=("sfi_pct","mean"),back_to_backs=("back_to_back","sum"),win_pct=("win","mean"),avg_margin=("point_diff","mean")).reset_index().sort_values("avg_friction_pct",ascending=False)
 
 result={
- "games":int(gm.game_id.nunique()),"team_game_rows":int(len(df)),"model_games":int(len(mod)),
+ "games":int(df.game_id.nunique()),"non_neutral_paired_games":int(gm.game_id.nunique()),"neutral_games":int(df.loc[df.neutral_site.eq(1),"game_id"].nunique()),"team_game_rows":int(len(df)),"model_games":int(len(mod)),
  "ols_coef":coef,"ols_p":p,"ols_ci":ci,
  "logit_odds_ratio":float(np.exp(lc)),"logit_p":lp,"logit_or_ci":orci,"avg_marginal_win_prob_change":ame,
  "road_low_decile":dec.iloc[0].to_dict(),"road_high_decile":dec.iloc[-1].to_dict(),
