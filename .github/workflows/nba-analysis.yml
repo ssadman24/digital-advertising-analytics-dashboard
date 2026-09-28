@@ -12,7 +12,8 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install pandas numpy pyarrow requests statsmodels
-      - run: python scratch/nba_analysis.py\n      - run: python scratch/nba_diag.py
+      - run: python scratch/nba_analysis.py
+      - run: python scratch/nba_diag.py
       - uses: actions/upload-artifact@v4
         with:
           name: nba-analysis-output
