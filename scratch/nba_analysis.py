@@ -13,6 +13,18 @@ BASE="https://raw.githubusercontent.com/llimllib/nba_data/main/data/gamelog_{yea
 OUT=Path("nba_outputs"); OUT.mkdir(exist_ok=True)
 RAW=Path("nba_raw"); RAW.mkdir(exist_ok=True)
 
+NEUTRAL_GAMES={
+ "0022200439":(19.4966,-99.1754,2240,"America/Mexico_City","Arena CDMX"),
+ "0022200678":(48.8386,2.3786,35,"Europe/Paris","Accor Arena"),
+ "0022300172":(19.4966,-99.1754,2240,"America/Mexico_City","Arena CDMX"),
+ "0022300527":(48.8386,2.3786,35,"Europe/Paris","Accor Arena"),
+ "0022400147":(19.4966,-99.1754,2240,"America/Mexico_City","Arena CDMX"),
+ "0022400621":(48.8386,2.3786,35,"Europe/Paris","Accor Arena"),
+ "0022400633":(48.8386,2.3786,35,"Europe/Paris","Accor Arena"),
+ "0022401229":(36.1029,-115.1784,620,"America/Los_Angeles","T-Mobile Arena"),
+ "0022401230":(36.1029,-115.1784,620,"America/Los_Angeles","T-Mobile Arena"),
+}
+
 VEN="""team,latitude,longitude,elevation_m,timezone,valid_from,valid_to
 ATL,33.7573,-84.3963,320,America/New_York,2020-12-01,2025-06-30
 BOS,42.3662,-71.0621,6,America/New_York,2020-12-01,2025-06-30
@@ -74,15 +86,22 @@ print("SOURCE COLUMNS",df.columns.tolist(),flush=True)
 df["game_date"]=pd.to_datetime(df.game_date)
 gid=df.game_id.astype(str).str.zfill(10); m=gid.str.startswith("002")
 if m.sum()>1000: df=df[m].copy()
+df["gid_norm"]=df.game_id.astype(str).str.zfill(10)
+df["neutral_site"]=df.gid_norm.isin(NEUTRAL_GAMES).astype(int)
 df["is_home"]=df.matchup.str.contains(r"vs\.",regex=True).astype(int)
-df["opponent"]=df.matchup.str.extract(r"(?:vs\.|@)\s+([A-Z]{2,3})",expand=False)
+df["opponent"]=df.matchup.str.split().str[-1]
 df["venue_team"]=np.where(df.is_home.eq(1),df.team_abbreviation,df.opponent)
 
 v=pd.read_csv(io.StringIO(VEN),parse_dates=["valid_from","valid_to"])
 vr=[]; hr=[]
-for vt,tm,dt in df[["venue_team","team_abbreviation","game_date"]].itertuples(index=False):
-    a=venue(vt,dt,v); h=venue(tm,dt,v)
-    vr.append((a.latitude,a.longitude,a.elevation_m,a.timezone))
+for gid,vt,tm,dt in df[["gid_norm","venue_team","team_abbreviation","game_date"]].itertuples(index=False):
+    h=venue(tm,dt,v)
+    if gid in NEUTRAL_GAMES:
+        lat,lon,elev,tz,_=NEUTRAL_GAMES[gid]
+        vr.append((lat,lon,elev,tz))
+    else:
+        a=venue(vt,dt,v)
+        vr.append((a.latitude,a.longitude,a.elevation_m,a.timezone))
     hr.append((h.latitude,h.longitude,h.elevation_m,h.timezone))
 df[["lat","lon","elevation_m","timezone"]]=pd.DataFrame(vr,index=df.index)
 df[["home_lat","home_lon","home_elevation_m","home_timezone"]]=pd.DataFrame(hr,index=df.index)
@@ -127,10 +146,12 @@ for c in cols:
 df["sfi"]=df[zs].mean(axis=1); df["sfi_pct"]=df.groupby("season").sfi.rank(pct=True)*100
 
 keep=["game_id","season","game_date","team_abbreviation","sfi","sfi_pct","travel_km","abs_timezone_shift","back_to_back","games_last_7d","road_streak","altitude_gain_m","team_form_10","point_diff","win"]
-h=df[df.is_home.eq(1)][keep].copy(); a=df[df.is_home.eq(0)][keep].copy()
-h=h.rename(columns={c:"home_"+c for c in keep if c not in ["game_id","season","game_date"]})
-a=a.rename(columns={c:"away_"+c for c in keep if c not in ["game_id","season","game_date"]})
-gm=h.merge(a,on=["game_id","season","game_date"])
+model_rows=df[df.neutral_site.eq(0)].copy()
+h=model_rows[model_rows.is_home.eq(1)][keep].copy(); a=model_rows[model_rows.is_home.eq(0)][keep].copy()
+h=h.rename(columns={c:"home_"+c for c in keep if c not in ["game_id","season"]})
+a=a.rename(columns={c:"away_"+c for c in keep if c not in ["game_id","season"]})
+gm=h.merge(a,on=["game_id","season"],validate="one_to_one")
+gm["game_date"]=gm["home_game_date"]
 gm["home_margin"]=gm.home_point_diff; gm["home_win"]=gm.home_win.astype(int)
 gm["friction_diff"]=gm.home_sfi-gm.away_sfi
 gm["friction_pct_diff"]=gm.home_sfi_pct-gm.away_sfi_pct
