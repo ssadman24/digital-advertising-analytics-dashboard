@@ -105,8 +105,8 @@ for gid,vt,tm,dt in df[["gid_norm","venue_team","team_abbreviation","game_date"]
     hr.append((h.latitude,h.longitude,h.elevation_m,h.timezone))
 df[["lat","lon","elevation_m","timezone"]]=pd.DataFrame(vr,index=df.index)
 df[["home_lat","home_lon","home_elevation_m","home_timezone"]]=pd.DataFrame(hr,index=df.index)
-df=df.sort_values(["team_abbreviation","game_date","game_id"]).reset_index(drop=True)
-g=df.groupby("team_abbreviation",group_keys=False)
+df=df.sort_values(["season","team_abbreviation","game_date","game_id"]).reset_index(drop=True)
+g=df.groupby(["season","team_abbreviation"],group_keys=False)
 df["prev_date"]=g.game_date.shift(); df["gap"]=(df.game_date-df.prev_date).dt.days
 df["rest_days"]=(df.gap-1).clip(lower=0); df["back_to_back"]=df.rest_days.eq(0).astype(int)
 for c in ["lat","lon","elevation_m","timezone"]: df["prev_"+c]=g[c].shift()
